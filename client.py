@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import numpy as np
+import csv
 
 # Create the client
 ctx = zmq.Context.instance()
@@ -11,30 +12,8 @@ client_socket = ctx.socket(zmq.PAIR)
 # Connect to the server
 client_socket.connect("tcp://127.0.0.1:8008")
 
-client_socket.send_string("SETJOBID 1")
+client_socket.send_string("SETJOBID 2")
 new_socket = client_socket.recv_string()
-
-def print_img(mat): 
-    global M, N 
-      
-    # Traverse through all rows 
-    for i in range(M): 
-          
-        # If current row is 
-        # even, print from 
-        # left to right 
-        if i % 2 == 0: 
-            for j in range(N): 
-                print(str(mat[i][j]), 
-                          end = " ") 
-  
-        # If current row is  
-        # odd, print from 
-        # right to left 
-        else: 
-            for j in range(N - 1, -1, -1): 
-                print(str(mat[i][j]),  
-                          end = " ") 
 
 # Check the GETINFO Job
 client_socket.send_string('GETINFO')
@@ -47,19 +26,45 @@ data_socket = ctx.socket(zmq.PAIR)
 
 data_socket.connect("tcp://127.0.0.1:" + new_socket)
 client_socket.send_string("STARTJOB")
+final=Image.new('L',(int(data[2])*int(data[6]),int(data[3])*int(data[7])))
+for i in range(8):
+    if i % 2 == 0: 
+        for j in range(8): 
+            msg = data_socket.recv()
+            img=Image.frombuffer("L", (int(data[0]),int(data[1])), msg,'raw','L',0,1)
+            final.paste(img,(j*(int(data[0])),i*(int(data[1]))))
+    else: 
+        for j in range(8 - 1, -1, -1): 
+            msg = data_socket.recv()
+            img=Image.frombuffer("L", (int(data[0]),int(data[1])), msg,'raw','L',0,1)
+            final.paste(img,(j*(int(data[0])),i*(int(data[1]))))
 
-final = np.zeros(shape=(int(data[2]),int(data[3])))
-for i in range(0,64):
-    print(i)
-    msg = data_socket.recv()
-    #msg=[msg[i:i+2] for i in range(0, len(msg), 1)]
-    q=0
-    inter=np.zeros(shape=(int(data[0]),int(data[1])))
-    img=Image.frombuffer("L", (512,512), msg,'raw','L',0,1)
-    img.show()
 
 # Process the Message
+final.show()
+image_data = np.asarray(final)
+print(np.matrix(image_data))
+""" with open('data.csv','w') as csvfile:
+    writer=csv.writer(csvfile,delimiter=' ',quotechar='|',quoting=csv.QUOTE_ALL)
+    for w in tt:
+        writer.writerow(w)
+ """    
+rd=[]
+dr=[]
+dc=[]
+cd=[]
+row,col=image_data.shape
 
-plt.imshow(inter, cmap="gray")
-plt.show()
+for i in range(row):
+    for j in range(col):
+        if(image_data[i][j]>240):
+            dr.append(int(i/1024))
+            dc.append(int(j/1024))
+            rd.append(i)
+            cd.append(j)
+
+
+with open('some2.csv', 'w') as f:
+    writer = csv.writer(f)
+    writer.writerows(zip(dr,dc,rd, cd))
 client_socket.send_string("END")
